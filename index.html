@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- CSS for map + styling -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #communityMap { height: 600px; width: 100%; border-radius: 10px; }
+    /* more styles */
+  </style>
+</head>
+<body>
+  <!-- HTML elements -->
+  <div id="communityMap"></div>
+  <button onclick="showNearbyMarkers(50)">Near Me</button>
+
+  <!-- JS for map + Supabase + markers -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+  <script>
+    // JS goes here: initialize map, fetch from Supabase, add markers, filter, near me
+  </script>
+</body>
+</html>
