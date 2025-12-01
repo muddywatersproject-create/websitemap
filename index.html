@@ -1,23 +1,181 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <!-- CSS for map + styling -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <meta charset="UTF-8">
+  <title>Community Map</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+
   <style>
-    #communityMap { height: 600px; width: 100%; border-radius: 10px; }
-    /* more styles */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f9f9f9;
+    }
+    #map { 
+      height: 600px; 
+      width: 100%; 
+      border-radius: 10px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-top: 10px;
+    }
+    .filter-container {
+      margin-bottom: 10px;
+    }
+    select, button {
+      margin-right: 10px;
+      padding: 5px 10px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    .leaflet-popup-content {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .leaflet-popup-content a {
+      color: #0077cc;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
-  <!-- HTML elements -->
-  <div id="communityMap"></div>
-  <button onclick="showNearbyMarkers(50)">Near Me</button>
 
-  <!-- JS for map + Supabase + markers -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
-  <script>
-    // JS goes here: initialize map, fetch from Supabase, add markers, filter, near me
-  </script>
+<h2>Community Directory Map</h2>
+
+<div class="filter-container">
+  <label>Community Type:</label>
+  <select id="typeFilter">
+    <option value="All">All</option>
+    <option value="House Church">House Church</option>
+    <option value="Glory Party">Glory Party</option>
+    <option value="Intentional Community">Intentional Community</option>
+    <option value="Ecovillage">Ecovillage</option>
+  </select>
+
+  <button onclick="showNearbyMarkers(50)">Near Me</button>
+</div>
+
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+
+<script>
+  // -------------------------------
+  // Supabase setup
+  // -------------------------------
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"; // replace with your Supabase URL
+  const SUPABASE_KEY = "YOUR_ANON_KEY"; // replace with your Supabase anon key
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  // -------------------------------
+  // Initialize Leaflet map with Carto Light tiles
+  // -------------------------------
+  var map = L.map('map').setView([37.7749, -122.4194], 4);
+
+  L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+  }).addTo(map);
+
+  var mapMarkers = [];
+
+  // -------------------------------
+  // Marker colors by community type
+  // -------------------------------
+  const typeColors = {
+    "House Church": "blue",
+    "Glory Party": "green",
+    "Intentional Community": "orange",
+    "Ecovillage": "purple",
+    "default": "red"
+  };
+
+  // -------------------------------
+  // Load communities from Supabase
+  // -------------------------------
+  async function loadCommunities() {
+    const { data: communities, error } = await supabase.from('communities').select('*');
+
+    if(error) {
+      console.error("Error fetching communities:", error);
+      return;
+    }
+
+    communities.forEach(c => {
+      if(c.lat && c.lng) {
+        const color = typeColors[c.type] || typeColors.default;
+
+        const marker = L.circleMarker([c.lat, c.lng], {
+          color: color,
+          radius: 8,
+          fillOpacity: 0.8
+        }).addTo(map);
+
+        marker.bindPopup(`
+          <b>${c.name}</b><br>
+          ${c.type}<br>
+          ${c.theological_emphasis || ''}<br>
+          <a href="${c.website}" target="_blank">Visit</a>
+        `);
+
+        mapMarkers.push({ marker: marker, data: c });
+      }
+    });
+  }
+
+  loadCommunities();
+
+  // -------------------------------
+  // Filter markers by community type
+  // -------------------------------
+  function filterMarkers(selectedType) {
+    mapMarkers.forEach(({ marker, data }) => {
+      if(selectedType === "All" || data.type === selectedType){
+        marker.addTo(map);
+      } else {
+        map.removeLayer(marker);
+      }
+    });
+  }
+
+  document.getElementById('typeFilter').addEventListener('change', function(){
+    filterMarkers(this.value);
+  });
+
+  // -------------------------------
+  // Show nearby markers
+  // -------------------------------
+  function showNearbyMarkers(radiusKm) {
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+
+        mapMarkers.forEach(({ marker, data }) => {
+          const distance = map.distance([userLat, userLng], [data.lat, data.lng]) / 1000;
+          if(distance <= radiusKm){
+            marker.addTo(map);
+          } else {
+            map.removeLayer(marker);
+          }
+        });
+
+        map.setView([userLat, userLng], 8);
+      });
+    } else {
+      alert("Geolocation not supported by your browser.");
+    }
+  }
+</script>
+
 </body>
 </html>
